@@ -23,6 +23,8 @@ export async function callCompletionApi({
   onFinish,
   onError,
   fetch = getOriginalFetch(),
+  setReasoning,
+  setIsReasoning,
 }: {
   api: string;
   prompt: string;
@@ -37,6 +39,8 @@ export async function callCompletionApi({
   onFinish: ((prompt: string, completion: string) => void) | undefined;
   onError: ((error: Error) => void) | undefined;
   fetch: ReturnType<typeof getOriginalFetch> | undefined;
+  setReasoning?: (reasoning: string) => void;
+  setIsReasoning?: (isReasoning: boolean) => void;
 }) {
   try {
     setLoading(true);
@@ -47,6 +51,8 @@ export async function callCompletionApi({
 
     // Empty the completion immediately.
     setCompletion('');
+    setReasoning?.('');
+    setIsReasoning?.(false);
 
     const response = await fetch(api, {
       method: 'POST',
@@ -75,6 +81,7 @@ export async function callCompletionApi({
     }
 
     let result = '';
+    let reasoning = '';
 
     switch (streamProtocol) {
       case 'text': {
@@ -103,6 +110,13 @@ export async function callCompletionApi({
                 if (streamPart.type === 'text-delta') {
                   result += streamPart.delta;
                   setCompletion(result);
+                } else if (streamPart.type === 'reasoning-start') {
+                  setIsReasoning?.(true);
+                } else if (streamPart.type === 'reasoning-delta') {
+                  reasoning += streamPart.delta;
+                  setReasoning?.(reasoning);
+                } else if (streamPart.type === 'reasoning-end') {
+                  setIsReasoning?.(false);
                 } else if (streamPart.type === 'error') {
                   throw new Error(streamPart.errorText);
                 }
@@ -125,6 +139,7 @@ export async function callCompletionApi({
       onFinish(prompt, result);
     }
 
+    setIsReasoning?.(false);
     setAbortController(null);
     return result;
   } catch (err) {
@@ -140,6 +155,7 @@ export async function callCompletionApi({
       }
     }
 
+    setIsReasoning?.(false);
     setError(err as Error);
   } finally {
     setLoading(false);

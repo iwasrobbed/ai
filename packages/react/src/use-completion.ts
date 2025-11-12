@@ -12,6 +12,10 @@ export type { UseCompletionOptions };
 export type UseCompletionHelpers = {
   /** The current completion result */
   completion: string;
+  /** The current reasoning result */
+  reasoning: string;
+  /** Whether reasoning is currently being generated */
+  isReasoning: boolean;
   /**
    * Send a new prompt to the API endpoint and update the completion state.
    */
@@ -90,6 +94,15 @@ export function useCompletion({
     fallbackData: initialCompletion,
   });
 
+  const { data: reasoningData, mutate: mutateReasoning } = useSWR<string>(
+    [api, completionId, 'reasoning'],
+    null,
+    { fallbackData: '' },
+  );
+
+  const { data: isReasoningData = false, mutate: mutateIsReasoning } =
+    useSWR<boolean>([completionId, 'isReasoning'], null);
+
   const { data: isLoading = false, mutate: mutateLoading } = useSWR<boolean>(
     [completionId, 'loading'],
     null,
@@ -97,6 +110,8 @@ export function useCompletion({
 
   const [error, setError] = useState<undefined | Error>(undefined);
   const completion = data!;
+  const reasoning = reasoningData!;
+  const isReasoning = isReasoningData;
 
   // Abort controller to cancel the current API call.
   const [abortController, setAbortController] =
@@ -134,6 +149,11 @@ export function useCompletion({
           (completion: string) => mutate(completion, false),
           throttleWaitMs,
         ),
+        setReasoning: throttle(
+          (reasoning: string) => mutateReasoning(reasoning, false),
+          throttleWaitMs,
+        ),
+        setIsReasoning: mutateIsReasoning,
         setLoading: mutateLoading,
         setError,
         setAbortController,
@@ -142,6 +162,8 @@ export function useCompletion({
       }),
     [
       mutate,
+      mutateReasoning,
+      mutateIsReasoning,
       mutateLoading,
       api,
       extraMetadataRef,
@@ -195,6 +217,8 @@ export function useCompletion({
 
   return {
     completion,
+    reasoning,
+    isReasoning,
     complete,
     error,
     setCompletion,
